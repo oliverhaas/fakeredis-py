@@ -85,8 +85,16 @@ class Writer:
         elif value is None:
             self.writer.write("$-1\r\n".encode())
         elif isinstance(value, Exception):
+            # redis-py strips error code prefixes when creating typed exceptions.
+            # We need to restore them for the wire protocol.
             if isinstance(value, redis.exceptions.NoScriptError):
                 error_msg = f"NOSCRIPT {value.args[0]}"
+            elif isinstance(value, redis.exceptions.AuthenticationError):
+                msg = str(value.args[0])
+                if not msg.startswith("WRONGPASS") and not msg.startswith("NOAUTH"):
+                    error_msg = f"WRONGPASS {msg}"
+                else:
+                    error_msg = msg
             else:
                 error_msg = value.args[0]
             self.writer.write(f"-{error_msg}\r\n".encode())
